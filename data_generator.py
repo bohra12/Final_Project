@@ -135,18 +135,6 @@ def fetch_stock_prices_yahoo(symbol, conn, max_rows=7):
 
 
 
-import time
-
-from bs4 import BeautifulSoup
-import requests
-
-
-import requests
-from bs4 import BeautifulSoup
-import sqlite3
-
-import requests
-import sqlite3
 
 def fetch_dividends_fmp(symbol, conn, max_rows=25):
     """
@@ -254,7 +242,7 @@ def fetch_insider_transactions_finnhub(symbol, conn, max_rows=7):
 
 
 def fetch_news_marketaux(symbol, conn):
-    """Fetches 25 news entries per run using MarketAux API."""
+    """Fetches 25 news entries per run using MarketAux API, avoiding duplicates."""
     cur = conn.cursor()
     cur.execute("""
         SELECT MAX(published_date) FROM News
@@ -276,7 +264,9 @@ def fetch_news_marketaux(symbol, conn):
 
     news_data = []
     page = 1
-    while len(news_data) < 6:  
+    seen_dates = set()  # Track seen published dates for this fetch cycle
+
+    while len(news_data) < 25:  # Limit to 25 news entries
         params["page"] = page
         response = requests.get(url, params=params)
         data = response.json()
@@ -292,12 +282,20 @@ def fetch_news_marketaux(symbol, conn):
 
         for article in articles:
             published_date = article.get("published_at", "Unknown")
+
+            # Skip if already processed in this cycle
+            if published_date in seen_dates:
+                continue
+            seen_dates.add(published_date)
+
+            # Check database for duplicates
             cur.execute("""
                 SELECT 1 FROM News WHERE published_date = ? AND stock_id = (
                     SELECT stock_id FROM Stocks WHERE ticker = ?
                 )
             """, (published_date, symbol))
             if cur.fetchone():
+                print(f"Duplicate found for {symbol} on {published_date}. Skipping.")
                 continue
 
             entities = article.get("entities", [])
@@ -313,13 +311,14 @@ def fetch_news_marketaux(symbol, conn):
                 "topics": ", ".join(entity_symbols) if entity_symbols else "No Topics"
             })
 
-            if len(news_data) >= 25:  
+            if len(news_data) >= 25:  # Stop once we have 25 new entries
                 break
 
         page += 1  
 
-    print(f"Fetched {len(news_data)} news entries for {symbol}.")
+    print(f"Fetched {len(news_data)} unique news entries for {symbol}.")
     return news_data
+
 
 def store_data_in_db(conn, symbol, stock_prices, dividends, insider_transactions, news_data):
     """Store the fetched data into the database."""
