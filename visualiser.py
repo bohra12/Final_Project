@@ -1,15 +1,22 @@
 import sqlite3
 import pandas as pd
 import matplotlib.pyplot as plt
+import sys
 
 DB_NAME = "stock_data.db"
+OUTPUT_FILE = "output_log.txt"
 
 def fetch_data_from_db():
     """Fetch all data from the SQLite database and return as pandas DataFrames."""
     conn = sqlite3.connect(DB_NAME)
+
     stocks = pd.read_sql_query("SELECT * FROM Stocks", conn)
     stock_prices = pd.read_sql_query("SELECT * FROM StockPrices", conn)
-    dividends = pd.read_sql_query("SELECT * FROM Dividends", conn)
+    dividends = pd.read_sql_query("""
+        SELECT d.*, df.frequency, df.dividend_type
+        FROM Dividends d
+        LEFT JOIN DividendFrequency df ON d.stock_id = df.stock_id AND d.date = df.date
+    """, conn)
     insider_transactions = pd.read_sql_query("SELECT * FROM InsiderTransactions", conn)
     news = pd.read_sql_query("SELECT * FROM News", conn)
 
@@ -99,32 +106,46 @@ def visualize_news_topics(news, stocks):
 
 
 def main():
+    # Redirect output to a file
+    sys.stdout = open(OUTPUT_FILE, "w")
+
     stocks, stock_prices, dividends, insider_transactions, news = fetch_data_from_db()
+
+    # Stock Price Summary
     price_summary = calculate_stock_price_summary(stock_prices, stocks)
     print("\nStock Price Summary:")
     print(price_summary)
     visualize_data(price_summary, "Stock Price Summary", "ticker", "avg_price", "Ticker", "Average Price", color="lightblue")
 
+    # Dividend Yield
     dividend_yield = calculate_dividend_yield(dividends, stock_prices, stocks)
     print("\nDividend Yield (including stocks with no dividends):")
     print(dividend_yield)
     visualize_data(dividend_yield, "Dividend Yield (%) by Stock", "ticker", "yield (%)", "Ticker", "Dividend Yield (%)", color="orange")
 
+    # Insider Transactions
     insider_summary = summarize_insider_transactions(insider_transactions, stocks)
     print("\nInsider Transactions Summary:")
     print(insider_summary)
     visualize_data(insider_summary, "Net Insider Transactions by Stock", "ticker", "change", "Ticker", "Net Change in Shares", color="purple")
 
+    # News Sentiment
     news_sentiment = calculate_news_sentiment(news, stocks)
     print("\nNews Sentiment Analysis:")
     print(news_sentiment)
     visualize_data(news_sentiment, "Average News Sentiment by Stock", "ticker", "sentiment", "Ticker", "Average Sentiment", color="green")
 
+    # News Topics
     print("\nVisualizing News Topics:")
     visualize_news_topics(news, stocks)
 
+    # Stock Prices Over Time
     print("\nVisualizing Stock Prices Over Time:")
     visualize_stock_prices(stock_prices, stocks)
+
+    # Reset output to default
+    sys.stdout.close()
+    sys.stdout = sys.__stdout__
 
 
 if __name__ == "__main__":

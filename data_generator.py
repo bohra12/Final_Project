@@ -2,12 +2,14 @@ import sqlite3
 import requests
 from datetime import datetime
 import yfinance as yf
+import time
 
 DB_NAME = "stock_data.db"
 
 MARKET_AUX_KEY = "la5KwzB2gLWX9Y8fKVsrAEYBEFEC6AnJyiUo7WLm"
 FINNHUB_KEY = "ctfne0pr01qi0nfdon4gctfne0pr01qi0nfdon50"
 OPENFIGI_KEY = "93bca677-feba-4a77-b7a2-b5a0894b822c"
+
 
 
 def setup_database():
@@ -76,6 +78,19 @@ def setup_database():
             UNIQUE(stock_id, published_date)
         )
     ''')
+    
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS DividendFrequency (
+            frequency_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            stock_id INTEGER,
+            date TEXT,
+            frequency INTEGER,
+            dividend_type TEXT,
+            FOREIGN KEY(stock_id) REFERENCES Stocks(stock_id),
+            UNIQUE(stock_id, date)
+        )
+    ''')
+
 
     conn.commit()
     conn.close()
@@ -118,39 +133,86 @@ def fetch_stock_prices_yahoo(symbol, conn, max_rows=7):
         return []
 
 
-def fetch_dividends_yahoo(symbol, conn, max_rows=25):
-    """Fetch dividend history for a given symbol using Yahoo Finance."""
-    try:
-        stock = yf.Ticker(symbol)
-        dividends = stock.dividends
-        dividend_data = []
-        count = 0
 
-        for date, dividend in dividends.items():
-            date_str = date.strftime("%Y-%m-%d")
-            cur = conn.cursor()
-            cur.execute("""
-                SELECT 1 FROM Dividends WHERE date = ? AND stock_id = (
-                    SELECT stock_id FROM Stocks WHERE ticker = ?
-                )
-            """, (date_str, symbol))
-            if cur.fetchone():
+
+import time
+
+from bs4 import BeautifulSoup
+import requests
+
+
+import requests
+from bs4 import BeautifulSoup
+import sqlite3
+
+import requests
+import sqlite3
+
+def fetch_dividends_fmp(symbol, conn, max_rows=25):
+    """
+    Fetch dividend history for a given symbol from Financial Modeling Prep API.
+    Populates both Dividends and DividendFrequency tables.
+    """
+    base_url = f"https://financialmodelingprep.com/api/v3/historical-price-full/stock_dividend/{symbol}"
+    api_key = "6MwrkQYWb9lkTrkJSTm3budgQiAo2Or6"  # Replace with your valid API key
+    params = {"apikey": api_key}
+
+    try:
+        # Fetch data from the API
+        response = requests.get(base_url, params=params)
+        response.raise_for_status()
+        data = response.json()
+
+        # Extract the historical dividend data
+        historical_dividends = data.get("historical", [])
+        if not historical_dividends:
+            print(f"No dividend data found for {symbol}. Response: {data}")
+            return []
+
+        cur = conn.cursor()
+        cur.execute("SELECT stock_id FROM Stocks WHERE ticker = ?", (symbol,))
+        stock_id = cur.fetchone()[0]
+
+        count = 0
+        for record in historical_dividends:
+            # Extract relevant fields
+            date = record.get("date")
+            dividend = record.get("dividend")
+            frequency = record.get("frequency", 0)  # Frequency: 0 (one-time), 4 (quarterly), etc.
+            dividend_type = record.get("dividendType", "CD")  # Cash (CD) or Special Cash (SC)
+
+            # Skip records with missing data
+            if not date or dividend is None:
                 continue
 
-            dividend_data.append({
-                "date": date_str,
-                "dividend": float(dividend)
-            })
+            # Insert into Dividends table
+            cur.execute("""
+                INSERT OR IGNORE INTO Dividends (stock_id, date, dividend)
+                VALUES (?, ?, ?)
+            """, (stock_id, date, dividend))
+
+            # Insert into DividendFrequency table
+            cur.execute("""
+                INSERT OR IGNORE INTO DividendFrequency (stock_id, date, frequency, dividend_type)
+                VALUES (?, ?, ?, ?)
+            """, (stock_id, date, frequency, dividend_type))
 
             count += 1
             if count >= max_rows:
                 break
 
-        print(f"Fetched {len(dividend_data)} dividend entries for {symbol}.")
-        return dividend_data
-    except Exception as e:
+        conn.commit()
+        print(f"Fetched and stored {count} dividend entries for {symbol}.")
+        return historical_dividends
+
+    except requests.exceptions.RequestException as e:
         print(f"Error fetching dividends for {symbol}: {e}")
         return []
+
+
+
+
+
 
 def fetch_insider_transactions_finnhub(symbol, conn, max_rows=7):
     """Fetch insider transaction data using Finnhub API."""
@@ -306,7 +368,7 @@ def main():
         print(f"Fetching data for {symbol}...")
 
         stock_prices = fetch_stock_prices_yahoo(symbol, conn)
-        dividends = fetch_dividends_yahoo(symbol, conn, max_rows)
+        dividends =   fetch_dividends_fmp(symbol, conn, max_rows)
         insider_transactions = fetch_insider_transactions_finnhub(symbol, conn)
         news_data = fetch_news_marketaux(symbol, conn)
 
