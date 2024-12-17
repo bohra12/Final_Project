@@ -1,0 +1,40 @@
+==================================================
+STOCK DATA ANALYSIS REPORT
+==================================================
+Generated on: 2024-12-16 22:14:27
+
+### Average Closing Prices ###
+ - AAPL: Avg=$220.75, Min=$206.76292419433594, Max=$234.29074096679688
+ - GOOGL: Avg=$172.76, Min=$156.97157287597656, Max=$190.70806884765625
+ - MSFT: Avg=$430.46, Min=$393.6510925292969, Max=$465.78643798828125
+ - TSLA: Avg=$218.54, Min=$181.57000732421875, Max=$263.260009765625
+
+### Total Dividends per Stock ###
+ - AAPL: $13.23
+ - GOOGL: $5.4
+ - MSFT: $41.94
+ - TSLA: $0.0
+
+### Total Insider Transactions per Stock ###
+ - AAPL: 54 transactions
+ - GOOGL: 54 transactions
+ - MSFT: 54 transactions
+ - TSLA: 48 transactions
+
+### Average Sentiment per Stock ###
+ - AAPL: Sentiment Score = 0.31
+ - GOOGL: Sentiment Score = 0.4
+ - MSFT: Sentiment Score = 0.35
+ - TSLA: Sentiment Score = 0.37
+
+### Closing Price Trends Over Time ###
+This section shows the minimum and maximum prices, and trends for each stock.
+
+ - AAPL: Min=$206.76292419433594 on 20240806, Max=$234.29074096679688 on 20240716
+ - GOOGL: Min=$156.97157287597656 on 20240903, Max=$190.70806884765625 on 20240710
+ - MSFT: Min=$393.6510925292969 on 20240805, Max=$465.78643798828125 on 20240705
+ - TSLA: Min=$181.57000732421875 on 20240620, Max=$263.260009765625 on 20240710
+
+==================================================
+End of Report
+==================================================
